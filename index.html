@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATRADEES | EdgeState ELITE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --system-blue: #0A84FF;
+            --bg-main: #000000;
+            --bg-sidebar: rgba(22, 22, 23, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --cell-w: 40px;
+            --cell-h: 26px;
+            --font-size: 10px;
+            --highlight-color: rgba(255, 255, 255, 0.12);
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+            background-color: var(--bg-main);
+            color: #f5f5f7; margin: 0; display: flex; height: 100vh; overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Sidebar Glassmorphism */
+        #sidebar { 
+            background: var(--bg-sidebar);
+            backdrop-filter: blur(50px) saturate(210%);
+            -webkit-backdrop-filter: blur(50px) saturate(210%);
+            width: 260px; flex-shrink: 0;
+            border-right: 0.5px solid var(--glass-border);
+            display: flex; flex-direction: column; z-index: 100;
+        }
+
+        /* Apple-Standard Scrubbers */
+        .scrubber {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px; padding: 10px 14px;
+            border: 0.5px solid var(--glass-border);
+            cursor: ew-resize; transition: all 0.2s ease;
+        }
+        .scrubber:hover { background: rgba(255, 255, 255, 0.06); }
+        .scrubber label { font-size: 9px; color: #86868b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .scrubber span { display: block; font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+        /* Matrix Table Styling */
+        .viewport { flex: 1; overflow: auto; background: #000; position: relative; padding: 40px; display: flex; padding-bottom: 120px; }
+        .matrix-table { border-collapse: separate; border-spacing: 0; table-layout: fixed; margin: auto; position: relative; }
+        
+        .matrix-table th, .matrix-table td { 
+            width: var(--cell-w); height: var(--cell-h); 
+            border-right: 0.5px solid rgba(255,255,255,0.015); 
+            border-bottom: 0.5px solid rgba(255,255,255,0.015); 
+            text-align: center; font-size: var(--font-size);
+            position: relative;
+        }
+        
+        .matrix-table th { 
+            background: rgba(0, 0, 0, 0.95); position: sticky; top: 0; z-index: 30; 
+            font-weight: 500; color: #86868b; border-bottom: 0.5px solid var(--glass-border);
+        }
+        .matrix-table td:first-child { 
+            background: rgba(0, 0, 0, 0.95); position: sticky; left: 0; z-index: 20; 
+            font-weight: 600; color: #fff; border-right: 0.5px solid var(--glass-border);
+            width: 64px !important;
+        }
+
+        /* High-Precision Crosshairs */
+        .row-active td { background-color: var(--highlight-color) !important; }
+        .col-active-cell { background-color: var(--highlight-color) !important; }
+        .axis-active { color: var(--system-blue) !important; background: rgba(10, 132, 255, 0.2) !important; z-index: 40 !important; }
+        .target-cell-box { outline: 2px solid var(--system-blue) !important; z-index: 45 !important; filter: brightness(1.5); }
+
+        /* Intelligence HUD */
+        #hud {
+            position: fixed; pointer-events: none;
+            background: var(--system-blue); color: white;
+            padding: 4px 8px; border-radius: 6px;
+            font-size: 12px; font-weight: 700;
+            z-index: 1000; display: none;
+            transform: translate(-50%, -140%);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            font-variant-numeric: tabular-nums;
+        }
+        #hud::after {
+            content: ''; position: absolute; top: 100%; left: 50%;
+            margin-left: -5px; border-width: 5px; border-style: solid;
+            border-color: var(--system-blue) transparent transparent transparent;
+        }
+
+        /* Dynamic Insight Overlay */
+        #insight-overlay {
+            position: fixed; bottom: 40px; left: calc(50% + 130px);
+            transform: translateX(-50%);
+            text-align: center; pointer-events: none; z-index: 100;
+            width: 80%;
+        }
+        #insight-overlay p {
+            font-size: 14px; font-weight: 500; letter-spacing: -0.01em;
+            color: rgba(255, 255, 255, 0.85); margin: 0;
+            transition: all 0.3s ease; opacity: 0;
+        }
+        #insight-overlay .value-highlight { color: #fff; font-weight: 700; }
+        #insight-overlay .profit-text { color: #32D74B; }
+        #insight-overlay .loss-text { color: #FF453A; }
+
+        #crosshair-toggle { cursor: pointer; transition: all 0.2s ease; user-select: none; }
+        #crosshair-toggle.off { color: #86868b; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); }
+
+        input[type="range"] { -webkit-appearance: none; height: 3px; background: rgba(255,255,255,0.1); border-radius: 5px; accent-color: var(--system-blue); }
+    </style>
+</head>
+<body>
+
+    <div id="hud">0.00</div>
+
+    <aside id="sidebar">
+        <div class="p-8 pt-10">
+            <div class="text-[10px] font-bold text-[#0A84FF] uppercase tracking-[0.2em] mb-1">ATRADEES</div>
+            <h1 class="text-xl font-semibold tracking-tight">EdgeState <span class="text-[10px] font-bold opacity-30 align-top ml-1">ELITE</span></h1>
+            <p class="text-[12px] text-[#86868b] mt-1">Expectancy Matrix</p>
+        </div>
+
+        <div class="px-6 flex-1 overflow-y-auto space-y-6">
+            <div>
+                <span class="block text-[10px] font-bold text-[#86868b] mb-3 uppercase tracking-widest">Win Probability</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="scrubber" id="scrub-wrMin" data-min="1" data-max="98" data-step="1"><label>Lower</label><span id="val-wrMin">30</span></div>
+                    <div class="scrubber" id="scrub-wrMax" data-min="2" data-max="99" data-step="1"><label>Upper</label><span id="val-wrMax">70</span></div>
+                </div>
+                <div class="scrubber mt-2" id="scrub-wrStep" data-min="0.5" data-max="10" data-step="0.5"><label>Resolution</label><span id="val-wrStep">2</span></div>
+            </div>
+
+            <div>
+                <span class="block text-[10px] font-bold text-[#86868b] mb-3 uppercase tracking-widest">Risk Management</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="scrubber" id="scrub-rrMin" data-min="0.1" data-max="10" data-step="0.1"><label>Min RR</label><span id="val-rrMin">1.0</span></div>
+                    <div class="scrubber" id="scrub-rrMax" data-min="0.2" data-max="50" data-step="0.1"><label>Max RR</label><span id="val-rrMax">5.0</span></div>
+                </div>
+                <div class="scrubber mt-2" id="scrub-rrStep" data-min="0.05" data-max="5" data-step="0.05"><label>Step RR</label><span id="val-rrStep">0.2</span></div>
+            </div>
+
+            <div class="pt-4 border-t border-white/5">
+                <span class="block text-[10px] font-bold text-[#86868b] mb-3 uppercase tracking-widest">Intensity</span>
+                <input type="range" id="contrast" min="1" max="100" value="40" class="w-full">
+            </div>
+        </div>
+
+        <div class="p-6 border-t border-white/5 mt-auto">
+            <div id="data-count" class="text-[9px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Calculated</div>
+            <div class="text-[9px] font-medium text-[#424245] uppercase tracking-[0.1em] mt-4 border-t border-white/5 pt-4">
+                © 2026 <span class="text-[#636366]">ATRADEES NETWORK</span>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col">
+        <header class="h-16 flex items-center justify-between px-10 bg-black/40 border-b border-white/5">
+            <div class="flex gap-8 items-center text-[10px] text-gray-500 font-bold uppercase tracking-wider">
+                <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-[#FF453A]"></div><span>Drawdown</span></div>
+                <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-[#32D74B]"></div><span>Growth</span></div>
+            </div>
+            <div id="crosshair-toggle" class="text-[10px] font-bold text-[#007AFF] bg-[#007AFF]/10 px-3 py-1 rounded-md border border-blue-500/20">CROSSHAIR ACTIVE</div>
+        </header>
+
+        <div class="viewport" id="viewport">
+            <table class="matrix-table" id="matrixTable">
+                <colgroup id="colgroup"></colgroup>
+                <thead id="thead"></thead>
+                <tbody id="tbody"></tbody>
+            </table>
+        </div>
+
+        <div id="insight-overlay">
+            <p id="insight-text"></p>
+        </div>
+    </main>
+
+    <script>
+        const state = { wrMin: 30, wrMax: 70, wrStep: 2, rrMin: 1.0, rrMax: 5.0, rrStep: 0.2, contrast: 4, crosshairEnabled: true };
+        const hud = document.getElementById('hud');
+        const insightText = document.getElementById('insight-text');
+        const crosshairBtn = document.getElementById('crosshair-toggle');
+
+        crosshairBtn.onclick = () => {
+            state.crosshairEnabled = !state.crosshairEnabled;
+            if (state.crosshairEnabled) {
+                crosshairBtn.innerText = "CROSSHAIR ACTIVE";
+                crosshairBtn.classList.remove('off');
+            } else {
+                crosshairBtn.innerText = "CROSSHAIR DISABLED";
+                crosshairBtn.classList.add('off');
+            }
+        };
+
+        const updateAdaptiveUI = (cols, rows) => {
+            const viewport = document.getElementById('viewport');
+            const availW = viewport.clientWidth - 140, availH = viewport.clientHeight - 100;
+            let cellW = Math.max(6, Math.min(80, availW / cols)), cellH = Math.max(4, Math.min(50, availH / rows));
+            document.documentElement.style.setProperty('--cell-w', `${cellW}px`);
+            document.documentElement.style.setProperty('--cell-h', `${cellH}px`);
+            let fontSize = cellW < 30 ? 0 : Math.min(10, cellW * 0.25);
+            document.documentElement.style.setProperty('--font-size', `${fontSize}px`);
+        };
+
+        let isDragging = false, startX, startVal, activeKey;
+
+        document.querySelectorAll('.scrubber').forEach(el => {
+            const key = el.id.replace('scrub-', '');
+            el.addEventListener('mousedown', e => { isDragging = true; activeKey = key; startX = e.clientX; startVal = state[key]; document.body.style.cursor = 'ew-resize'; });
+            el.addEventListener('wheel', e => { e.preventDefault(); const step = parseFloat(el.dataset.step), dir = e.deltaY > 0 ? -1 : 1; applyValue(key, state[key] + (dir * step), el); }, {passive: false});
+        });
+
+        const applyValue = (key, rawVal, el) => {
+            const min = parseFloat(el.dataset.min), max = parseFloat(el.dataset.max);
+            state[key] = Math.max(min, Math.min(max, Number(rawVal.toFixed(2))));
+            document.getElementById(`val-${key}`).innerText = state[key].toLocaleString(undefined, {minimumFractionDigits: key.includes('wr') ? 0 : 1});
+            render();
+        };
+
+        document.addEventListener('mousemove', e => { if (isDragging) { const el = document.getElementById(`scrub-${activeKey}`); const step = parseFloat(el.dataset.step); const delta = Math.round((e.clientX - startX) / 10) * step; applyValue(activeKey, startVal + delta, el); }});
+        document.addEventListener('mouseup', () => { isDragging = false; document.body.style.cursor = 'default'; });
+
+        const render = () => {
+            const thead = document.getElementById('thead'), tbody = document.getElementById('tbody'), colgroup = document.getElementById('colgroup');
+            const rrVals = []; for (let rr = state.rrMin; rr <= state.rrMax; rr = +(rr + state.rrStep).toFixed(2)) rrVals.push(rr);
+            const wrVals = []; for (let wr = state.wrMax; wr >= state.wrMin; wr = +(wr - state.wrStep).toFixed(2)) wrVals.push(wr);
+            updateAdaptiveUI(rrVals.length, wrVals.length);
+            
+            colgroup.innerHTML = ''; thead.innerHTML = ''; tbody.innerHTML = '';
+            let colHtml = '<col>', headerHtml = '<tr><th>WR %</th>';
+            rrVals.forEach(rr => { colHtml += '<col>'; headerHtml += `<th>${rr}</th>`; });
+            colgroup.innerHTML = colHtml; thead.innerHTML = headerHtml + '</tr>';
+            
+            const frag = document.createDocumentFragment();
+            wrVals.forEach(wr => {
+                const tr = document.createElement('tr');
+                let rowHtml = `<td>${wr}%</td>`;
+                rrVals.forEach(rr => { 
+                    const exp = ((wr / 100) * rr) - ((100 - wr) / 100); 
+                    rowHtml += `<td style="background-color: ${getHeatmapColor(exp, state.contrast)}" data-exp="${exp.toFixed(3)}"></td>`; 
+                });
+                tr.innerHTML = rowHtml; frag.appendChild(tr);
+            });
+            tbody.appendChild(frag);
+            document.getElementById('data-count').innerText = `${(rrVals.length * wrVals.length).toLocaleString()} Analysed Points`;
+            setupInteraction();
+        };
+
+        const setupInteraction = () => {
+            const tbody = document.querySelector('tbody');
+            const ths = document.querySelectorAll('thead th');
+
+            document.querySelectorAll('tbody td').forEach(cell => {
+                if (cell.cellIndex === 0) return;
+
+                cell.onmouseenter = (e) => {
+                    const colIdx = cell.cellIndex;
+                    const row = cell.parentElement;
+                    const val = parseFloat(cell.getAttribute('data-exp'));
+
+                    if (state.crosshairEnabled) {
+                        row.classList.add('row-active');
+                        row.cells[0].classList.add('axis-active');
+                        Array.from(tbody.rows).forEach(r => r.cells[colIdx].classList.add('col-active-cell'));
+                        if (ths[colIdx]) ths[colIdx].classList.add('axis-active');
+                        cell.classList.add('target-cell-box');
+                    }
+
+                    hud.style.display = 'block';
+                    hud.innerText = val.toFixed(3);
+
+                    const dollarVal = Math.abs(val * 100).toFixed(2);
+                    if (val > 0) {
+                        insightText.innerHTML = `This configuration yields approximately <span class="profit-text">$${dollarVal}</span> net profit for every <span class="value-highlight">$100</span> committed to risk.`;
+                    } else if (val < 0) {
+                        insightText.innerHTML = `Statistical variance suggests a capital decay of <span class="loss-text">$${dollarVal}</span> per <span class="value-highlight">$100</span> of risk exposure.`;
+                    } else {
+                        insightText.innerHTML = `Strategic equilibrium reached. Zero net expectation per $100 exposure.`;
+                    }
+                    insightText.style.opacity = "1";
+                };
+
+                cell.onmousemove = (e) => {
+                    hud.style.left = e.clientX + 'px';
+                    hud.style.top = e.clientY + 'px';
+                };
+
+                cell.onmouseleave = () => {
+                    const colIdx = cell.cellIndex;
+                    const row = cell.parentElement;
+                    row.classList.remove('row-active');
+                    row.cells[0].classList.remove('axis-active');
+                    Array.from(tbody.rows).forEach(r => r.cells[colIdx].classList.remove('col-active-cell'));
+                    if (ths[colIdx]) ths[colIdx].classList.remove('axis-active');
+                    cell.classList.remove('target-cell-box');
+                    hud.style.display = 'none';
+                    insightText.style.opacity = "0";
+                };
+            });
+        };
+
+        const getHeatmapColor = (exp, contrast) => {
+            const c = contrast / 10;
+            if (Math.abs(exp) < 0.005) return '#FFD60A';
+            const intensity = Math.min(1, Math.abs(exp) * c);
+            const l = Math.max(8, 45 - (intensity * 35));
+            return exp < 0 ? `hsl(0, 75%, ${l}%)` : `hsl(145, 75%, ${l}%)`;
+        };
+
+        document.getElementById('contrast').oninput = (e) => { state.contrast = e.target.value; render(); };
+        window.onresize = render; window.onload = render;
+    </script>
+</body>
+</html>
